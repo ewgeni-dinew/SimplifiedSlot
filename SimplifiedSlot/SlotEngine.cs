@@ -1,43 +1,73 @@
 ﻿using SimplifiedSlot.SlotSymbols;
 using SimplifiedSlot.Utils;
+using SimplifiedSlot.Utils.Contracts;
 
 namespace SimplifiedSlot
 {
-    internal class SlotEngine
+    public class SlotEngine
     {
         private const int CONSOLE_ROWS_COUNT = 4;
         private const int CONSOLE_COLUMNS_COUNT = 3;
+        private const string NUMBER_FORMAT = "f2";
 
-        public SlotEngine() { }
+        private decimal userBalance = 0;
+        private readonly IConsole console;
+        private readonly ISlotEngineHelper slotEngineHelper;
+
+        public SlotEngine(decimal userBalance, IConsole console, ISlotEngineHelper slotEngineHelper)
+        {
+            this.userBalance = userBalance;
+            this.console = console;
+            this.slotEngineHelper = slotEngineHelper;
+        }
 
         public void Run()
         {
-            Console.WriteLine("Please deposit money you would like to play with:");
-            var depositAmount = decimal.Parse(Console.ReadLine());
-
             while (true)
             {
-                Console.WriteLine("Enter stake amount:");
-                var stakeAmount = int.Parse(Console.ReadLine());
+                var tempBalance = this.userBalance;
+                try
+                {
+                    this.console.WriteLine("Enter stake amount:");
 
-                depositAmount -= stakeAmount;
+                    var stakeAmount = ConsoleHelpers.ReadAmountFromString(this.console);
 
-                var spinResultCoefficient = GetSpinSlotCoefficient();
+                    if (stakeAmount > this.userBalance)
+                        throw new ArgumentException(Errors.STAKE_GREATER_THAN_BALANCE);
 
-                var spinResult = CalculateSpinResult(stakeAmount, spinResultCoefficient);
+                    this.userBalance -= stakeAmount;
 
-                Console.WriteLine($"You have won: {spinResult}");
+                    var spinResultCoefficient = GetSpinSlotCoefficient();
 
-                depositAmount += (decimal)spinResult;
+                    var spinResult = this.slotEngineHelper.GetSpinWinAmount(stakeAmount, spinResultCoefficient);
 
-                Console.WriteLine($"Current balance is: {depositAmount}" + Environment.NewLine);
+                    this.console.WriteLine($"You have won: {spinResult.ToString(NUMBER_FORMAT)}");
+
+                    this.userBalance += spinResult;
+
+                    this.console.WriteLine($"Current balance is: {this.userBalance.ToString(NUMBER_FORMAT)}" + Environment.NewLine);
+                }
+                catch (ArgumentException ex)
+                {
+                    //Argument exceptions should be regarded as handled...
+                    throw ex;
+                }
+                catch (Exception)
+                {
+                    throw new ArgumentException(Errors.UNHANDLED_EXCEPTION);
+                }
+                finally
+                {
+                    if (this.userBalance != tempBalance)
+                        this.userBalance = tempBalance;
+                }
             }
         }
 
-        private double GetSpinSlotCoefficient()
+        public decimal GetSpinSlotCoefficient()
         {
             var random = new Random();
-            var tasks = new List<Task<double>>(CONSOLE_ROWS_COUNT);
+            var tasks = new List<Task<decimal>>(CONSOLE_ROWS_COUNT);
 
             for (int i = 0; i < CONSOLE_ROWS_COUNT; i++)
             {
@@ -48,40 +78,24 @@ namespace SimplifiedSlot
                     var spinRow = new List<SlotSymbol>();
                     for (int j = 0; j < CONSOLE_COLUMNS_COUNT; j++)
                     {
-                        var randomNum = random.Next(0, 100); //value range [0, 99] 
+                        var randomNum = random.Next(0, 20); //value range [0, 19] 
 
                         switch (randomNum)
                         {
-                            case < 45: spinRow.Add(new AppleSlotSymbol()); break;
-                            case < 80: spinRow.Add(new BananaSlotSymbol()); break;
-                            case < 95: spinRow.Add(new PineappleSlotSymbol()); break;
-                            case < 100: spinRow.Add(new WildcardSlotSymbol()); break;
+                            case < 9: spinRow.Add(new AppleSlotSymbol()); break; //45%
+                            case < 16: spinRow.Add(new BananaSlotSymbol()); break; //35%
+                            case < 18: spinRow.Add(new PineappleSlotSymbol()); break; //15%
+                            case <= 19: spinRow.Add(new WildcardSlotSymbol()); break; //5%
                         }
                     }
-                    var temp = GetRowWinCoefficient(spinRow);
-                    Console.WriteLine(string.Join("", spinRow.Select(s => s.Symbol)));
-                    return temp;
+
+                    this.console.WriteLine(string.Join("", spinRow.Select(s => s.Symbol)));
+
+                    return this.slotEngineHelper.GetRowWinCoefficient(spinRow);
                 }));
             }
 
-            return Task.WhenAll(tasks).Result.Sum(); //could be awaited
-        }
-
-        private double GetRowWinCoefficient(IEnumerable<SlotSymbol> spinRow)
-        {
-            var result = 0d;
-            spinRow = spinRow.Where(s => s.Symbol != Constants.WILDCARD_SYMBOL);
-
-            if (spinRow.DistinctBy(s => s.Symbol).Count() == 1)
-            {
-                result = spinRow.Count() * spinRow.DistinctBy(s => s.Symbol).First().Coefficient;
-            }
-            return result;
-        }
-
-        private double CalculateSpinResult(int stakeAmount, double spinResultCoef)
-        {
-            return stakeAmount * spinResultCoef;
+            return Task.WhenAll(tasks).Result.Sum();
         }
     }
 }
