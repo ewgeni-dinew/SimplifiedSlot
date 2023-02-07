@@ -10,7 +10,7 @@ namespace SimplifiedSlot
             console.WriteLine("Please deposit money you would like to play with:");
             var depositAmount = ConsoleHelpers.ReadAmountFromString(console);
 
-            var engine = new SlotEngine(depositAmount, console, new SlotEngineHelper());
+            var engine = new SlotEngine(depositAmount, console, new SlotCalculator());
             engine.Run();
         }
     }

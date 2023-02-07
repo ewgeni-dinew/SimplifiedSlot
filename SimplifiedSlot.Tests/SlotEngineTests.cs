@@ -15,7 +15,7 @@ namespace SimplifiedSlot.Tests
             var stake = 1000;
             var console = new TestConsole();
             console.AddCommand(stake.ToString()); //first command
-            var engine = new SlotEngine(deposit, console, new SlotEngineHelper());
+            var engine = new SlotEngine(deposit, console, new SlotCalculator());
 
             var action = () => engine.Run();
             action.Should().Throw<ArgumentException>().WithMessage(Errors.STAKE_GREATER_THAN_BALANCE);

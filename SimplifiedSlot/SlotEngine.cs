@@ -1,5 +1,4 @@
-﻿using SimplifiedSlot.SlotSymbols;
-using SimplifiedSlot.Utils;
+﻿using SimplifiedSlot.Utils;
 using SimplifiedSlot.Utils.Contracts;
 
 namespace SimplifiedSlot
@@ -12,13 +11,13 @@ namespace SimplifiedSlot
 
         private decimal userBalance = 0;
         private readonly IConsole console;
-        private readonly ISlotEngineHelper slotEngineHelper;
+        private readonly ISlotCalculator calculator;
 
-        public SlotEngine(decimal userBalance, IConsole console, ISlotEngineHelper slotEngineHelper)
+        public SlotEngine(decimal userBalance, IConsole console, ISlotCalculator calculator)
         {
             this.userBalance = userBalance;
             this.console = console;
-            this.slotEngineHelper = slotEngineHelper;
+            this.calculator = calculator;
         }
 
         public void Run()
@@ -37,9 +36,13 @@ namespace SimplifiedSlot
 
                     this.userBalance -= stakeAmount;
 
-                    var spinResultCoefficient = GetSpinSlotCoefficient();
+                    var spinRowPairs = this.calculator.GetSpinTotalRows(CONSOLE_ROWS_COUNT, CONSOLE_COLUMNS_COUNT);
 
-                    var spinResult = this.slotEngineHelper.GetSpinWinAmount(stakeAmount, spinResultCoefficient);
+                    PrintSpinRows(spinRowPairs);
+
+                    var spinTotalCoefficient = this.calculator.GetSpinTotalCoefficient(spinRowPairs);
+
+                    var spinResult = this.calculator.GetSpinWinAmount(stakeAmount, spinTotalCoefficient);
 
                     this.console.WriteLine($"You have won: {spinResult.ToString(NUMBER_FORMAT)}");
 
@@ -54,48 +57,17 @@ namespace SimplifiedSlot
                 }
                 catch (Exception)
                 {
-                    throw new ArgumentException(Errors.UNHANDLED_EXCEPTION);
-                }
-                finally
-                {
                     if (this.userBalance != tempBalance)
                         this.userBalance = tempBalance;
+                    throw new ArgumentException(Errors.UNHANDLED_EXCEPTION);
                 }
             }
         }
 
-        public decimal GetSpinSlotCoefficient()
+        private void PrintSpinRows(IEnumerable<RowCoefficientPair> rowPairs)
         {
-            var random = new Random();
-            var tasks = new List<Task<decimal>>(CONSOLE_ROWS_COUNT);
-
-            for (int i = 0; i < CONSOLE_ROWS_COUNT; i++)
-            {
-                var spinRow = new List<SlotSymbol>();
-
-                tasks.Add(Task.Run(() =>
-                {
-                    var spinRow = new List<SlotSymbol>();
-                    for (int j = 0; j < CONSOLE_COLUMNS_COUNT; j++)
-                    {
-                        var randomNum = random.Next(0, 20); //value range [0, 19] 
-
-                        switch (randomNum)
-                        {
-                            case < 9: spinRow.Add(new AppleSlotSymbol()); break; //45%
-                            case < 16: spinRow.Add(new BananaSlotSymbol()); break; //35%
-                            case < 18: spinRow.Add(new PineappleSlotSymbol()); break; //15%
-                            case <= 19: spinRow.Add(new WildcardSlotSymbol()); break; //5%
-                        }
-                    }
-
-                    this.console.WriteLine(string.Join("", spinRow.Select(s => s.Symbol)));
-
-                    return this.slotEngineHelper.GetRowWinCoefficient(spinRow);
-                }));
-            }
-
-            return Task.WhenAll(tasks).Result.Sum();
+            foreach (var rowPair in rowPairs)
+                this.console.WriteLine(string.Join("", rowPair.Row.Select(r => r.Symbol)));
         }
     }
 }
