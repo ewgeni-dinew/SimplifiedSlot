@@ -64,6 +64,11 @@ namespace SimplifiedSlot
             }
         }
 
+        public decimal GetUserBalance()
+        {
+            return this.userBalance;
+        }
+
         private void PrintSpinRows(IEnumerable<RowCoefficientPair> rowPairs)
         {
             foreach (var rowPair in rowPairs)
